@@ -291,6 +291,7 @@ def initializeGame(app):
     app.stationSpawnRate = 600 #Every 10 seconds
     app.score = 0
     app.segment_map = {}
+    app.paused = False
     
     #Initial state
     app.stations.append(Station(600, 400, 'circle'))
@@ -308,11 +309,7 @@ def onAppStart(app):
 def onStep(app):
     if app.gameOver:
         return
-    app.timer += 1
 
-    if app.passengerSpawnRate > 10 and app.timer % 180 == 0:
-            app.passengerSpawnRate -= 1
-    
     #AI - creates a map of all shared tracks
     segment_map = {}
     for line in app.lines:
@@ -327,6 +324,14 @@ def onStep(app):
     for segment in segment_map:
         segment_map[segment].sort(key=lambda l: l.color)
     app.segment_map = segment_map
+
+    if app.paused:
+        return
+    app.timer += 1
+
+    if app.passengerSpawnRate > 10 and app.timer % 180 == 0:
+        app.passengerSpawnRate -= 1
+    
 
     #animate trains
     for line in app.lines:
@@ -402,10 +407,12 @@ def onMousePress(app, mouseX, mouseY):
             app.selectedStation = None #clicked on empty space, unselect
     else:
         app.selectedStation = None
-
+        
 def onKeyPress(app, key):
-    if key == 'space' and app.gameOver:
+    if key == 'space' and app.gameOver: #restart game
         initializeGame(app)
+    elif key == 'space' and not app.gameOver: #pause & unpause
+        app.paused = not app.paused
 
 def redrawAll(app):
     drawRect(0, 0, app.width, app.height, fill='lightGoldenrodYellow') #background
@@ -496,6 +503,10 @@ def redrawAll(app):
         drawLabel("Yellow: Currently selected  Green: Available connections  Blue: Create new line", app.width//2, app.height - 150, size=18, fill='black', font='montserrat')
     else:
         drawLabel("Click a station to draw lines", app.width//2, app.height - 200, size=18, fill='black', font='montserrat')
+
+    if app.paused:
+        drawRect(app.width/2 - 20, app.height/2 - 100, 20, 100, fill='maroon', opacity=50)
+        drawRect(app.width/2 + 20, app.height/2 - 100, 20, 100, fill='maroon', opacity=50)
 
     if app.gameOver:
         drawRect(app.width/2 - 200, app.height/2 - 75, 400, 150, fill='maroon', opacity=50)
