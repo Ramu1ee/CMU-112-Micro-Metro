@@ -278,7 +278,7 @@ class Train:
             elif p.destinationShape == 'pentagon':
                 drawRegularPolygon(px, py, 4, 5, fill='white')
 
-def initializeGame(app):
+def game_onScreenActivate(app):
     """Initialize or reset all game variables"""
     app.stations = []
     app.lines = []
@@ -289,7 +289,6 @@ def initializeGame(app):
     app.timer = 0
     app.passengerSpawnRate = 120 #Starts every 2 seconds, gradually increases
     app.stationSpawnRate = 600 #Every 10 seconds
-    app.score = 0
     app.segment_map = {}
     app.paused = False
     
@@ -304,10 +303,12 @@ def initializeGame(app):
 
 def onAppStart(app):
     app.stepsPerSecond = 60
-    initializeGame(app)
+    app.highScore = 0
 
-def onStep(app):
+def game_onStep(app):
     if app.gameOver:
+        if app.highScore < app.timer:
+            app.highScore = app.timer
         return
 
     #AI - creates a map of all shared tracks
@@ -377,7 +378,7 @@ def findExtendableLine(app, station1, station2):
 
     return None, None, None
 
-def onMousePress(app, mouseX, mouseY):
+def game_onMousePress(app, mouseX, mouseY):
     if app.gameOver:
         return
 
@@ -408,15 +409,16 @@ def onMousePress(app, mouseX, mouseY):
     else:
         app.selectedStation = None
         
-def onKeyPress(app, key):
+def game_onKeyPress(app, key):
     if key == 'space' and app.gameOver: #restart game
-        initializeGame(app)
+        game_onScreenActivate(app)
     elif key == 'space' and not app.gameOver: #pause & unpause
         app.paused = not app.paused
+    if key == 'escape':
+        setActiveScreen('menu')
 
-def redrawAll(app):
+def game_redrawAll(app):
     drawRect(0, 0, app.width, app.height, fill='lightGoldenrodYellow') #background
-
     #AI - separating overlapping lines
     spacing = 8
     if hasattr(app, 'segment_map'):
@@ -515,7 +517,28 @@ def redrawAll(app):
         drawLabel(f"You survived {app.timer // 60} seconds", app.width/2, app.height/2 + 35, size=20, fill='white', font='montserrat')
         drawLabel("Press SPACE to restart", app.width/2, app.height/2 + 90, size=20, fill='gray', bold=True, font='montserrat')
 
+def menu_onScreenActivate(app):
+    pass
+
+def menu_onMousePress(app, mouseX, mouseY):
+    if (mouseX < app.width/2 + 140 and mouseX > app.width/2 - 140 and
+        mouseY < app.height/2 + 240 and mouseY > app.height/2 + 160):
+        setActiveScreen('game')
+
+def menu_redrawAll(app):
+    drawRect(0, 0, app.width, app.height, fill='aliceBlue') #background
+    #Logo
+    drawLabel('MICRO', app.width/2 - 200, app.height/2 - 140, fill=gradient('darkRed','crimson', start='bottom'), size=100, bold=True, font='montserrat')
+    drawLabel('METRO', app.width/2 + 200, app.height/2 - 140, fill=gradient('darkRed','crimson',start='bottom'), size=100, bold=True, font='montserrat')
+    #Start button
+    drawRect(app.width/2, app.height/2 + 200, 200, 80, fill='cornflowerBlue', align='center')
+    drawCircle(app.width/2 - 100, app.height/2 + 200, 40, fill='cornflowerBlue')
+    drawCircle(app.width/2 + 100, app.height/2 + 200, 40, fill='cornflowerBlue')
+    drawLabel("Start Game", app.width/2, app.height/2 + 200, fill='dimGray', size=40, bold=True, font='montserrat')
+    #Score
+    drawLabel(f'High Score: {app.highScore}', app.width/2, app.height/2 + 60, size=20, font='montserrat')
+
 def main():
-    runApp(width=1600, height=900)
+    runAppWithScreens(initialScreen='game', width=1600, height=900)
 
 main()
