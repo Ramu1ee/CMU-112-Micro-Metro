@@ -539,20 +539,20 @@ def start_redrawAll(app):
 
 def menu_onScreenActivate(app):
     app.gameSelected = False
-    app.selectedMap = None
-    app.selectedDifficulty = None
+    app.selectedMap = 'New York'
+    app.selectedDifficulty = 'Easy'
     app.mapButtons = [
-        {'label': 'New York', 'x': 250, 'y': 250 },
-        {'label': 'Tokyo', 'x': 650, 'y': 250 },
-        {'label': 'Hong Kong', 'x': 1050, 'y': 250 }
+        {'label': 'New York', 'x': 250, 'y': 250},
+        {'label': 'Tokyo', 'x': 500, 'y': 250},
+        {'label': 'Hong Kong', 'x': 750, 'y': 250}
     ]
     app.difficultyButtons = [
         {'label': 'Easy', 'x': 250, 'y': 550 },
-        {'label': 'Medium', 'x': 650, 'y': 550 },
-        {'label': 'Hard', 'x': 1050, 'y': 550 }
+        {'label': 'Medium', 'x': 500, 'y': 550 },
+        {'label': 'Hard', 'x': 750, 'y': 550 }
     ]
-    app.buttonWidth = 300
-    app.buttonHeight = 180
+    app.buttonWidth = 200
+    app.buttonHeight = 100
 
 def menu_onMousePress(app, mouseX, mouseY):
     for button in app.mapButtons:
@@ -573,43 +573,60 @@ def menu_onKeyPress(app, key):
         setActiveScreen('start')
     
 def menu_redrawAll(app):
-    drawRect(0, 0, app.width, app.height, fill='aliceBlue') #background
-    #Map selection UI
-    drawLabel("Select Map", 100, 100, fill='cornflowerBlue', size=40, font='montserrat', align='left')
+    # 1. Define highlight color based on selected difficulty
+    colorMap = {
+        'Easy': rgb(230, 250, 255),
+        'Medium': rgb(255, 255, 224),
+        'Hard': rgb(255, 230, 240)
+    }
+    # Default to cornflowerBlue if no difficulty is selected yet
+    highlightColor = colorMap.get(app.selectedDifficulty, 'cornflowerBlue')
+
+    # Background Image (no changes)
+    if app.selectedMap == 'New York':
+        drawImage('code/CMU Term project/img/NY.jpg', 0, 0, width=app.width, height=app.height)
+    elif app.selectedMap == 'Tokyo':
+        drawImage('code/CMU Term project/img/TK.jpg', 0, 0, width=app.width, height=app.height)
+    elif app.selectedMap == 'Hong Kong':
+        drawImage('code/CMU Term project/img/HK.jpg', 0, 0, width=app.width, height=app.height)
+    
+    # Map selection UI
+    drawLabel("Select Map", 100, 100, fill='aliceBlue', size=40, bold=True, font='montserrat', align='left')
     for button in app.mapButtons:
-        color = 'cornflowerBlue' if app.selectedMap == button['label'] else 'lightGray'
-        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 40, color)
-        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat')
-    #Difficulty selection UI
-    drawLabel("Select Difficulty", 100, 400, fill='cornflowerBlue', size=40, font='montserrat', align='left')
+        # 2. Use the dynamic highlightColor
+        color = highlightColor if app.selectedMap == button['label'] else 'darkGray'
+        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
+        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
+
+    # Difficulty selection UI
+    drawLabel("Select Difficulty", 100, 400, fill='aliceBlue', size=40, font='montserrat', bold=True, align='left')
     for button in app.difficultyButtons:
-        color = 'cornflowerBlue' if app.selectedDifficulty == button['label'] else 'lightGray'
-        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 40, color)
-        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat')
-    #Launch game button
-    if app.gameSelected:
-        buttonColor = 'cornflowerBlue'
-    else:
-        buttonColor = 'lightGray'
-    drawRect(app.width/2, app.height/2 + 300, 200, 80, fill=buttonColor, align='center')
-    drawCircle(app.width/2 - 100, app.height/2 + 300, 40, fill=buttonColor)
-    drawCircle(app.width/2 + 100, app.height/2 + 300, 40, fill=buttonColor)
-    drawLabel("Play", app.width/2, app.height/2 + 300, fill='aliceBlue', size=40, bold=True, font='montserrat')
+        # 3. Use the dynamic highlightColor here as well
+        color = highlightColor if app.selectedDifficulty == button['label'] else 'darkGray'
+        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
+        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
+
+    # Launch game button
+    # 4. Use the dynamic highlightColor for the start button
+    drawRect(app.width/2, app.height/2 + 300, 200, 80, fill=highlightColor, align='center')
+    drawCircle(app.width/2 - 100, app.height/2 + 300, 40, fill=highlightColor)
+    drawCircle(app.width/2 + 100, app.height/2 + 300, 40, fill=highlightColor)
+    drawLabel("Start", app.width/2, app.height/2 + 300, fill=rgb(80, 80, 80), size=40, bold=True, font='montserrat')
 
 def drawRoundedRect(centerX, centerY, width, height, radius, fill):
-    radius = min(abs(radius), width / 2, height / 2)
-    drawRect(centerX, centerY, width, height - 2 * radius, fill=fill, align='center')
-    drawRect(centerX, centerY, width - 2 * radius, height, fill=fill, align='center')
-    drawCircle(centerX - width / 2 + radius, centerY - height / 2 + radius, radius, fill=fill)
-    drawCircle(centerX + width / 2 - radius, centerY - height / 2 + radius, radius, fill=fill)
-    drawCircle(centerX - width / 2 + radius, centerY + height / 2 - radius, radius, fill=fill)
-    drawCircle(centerX + width / 2 - radius, centerY + height / 2 - radius, radius, fill=fill)
+    radius = min(abs(radius), width/2, height / 2)
+    drawRect(centerX, centerY, width, height - 2*radius, fill=fill, align='center')
+    drawRect(centerX, centerY, width - 2*radius, height, fill=fill, align='center')
+    drawCircle(centerX - width/2 + radius, centerY - height/2 + radius, radius, fill=fill)
+    drawCircle(centerX + width/2 - radius, centerY - height/2 + radius, radius, fill=fill)
+    drawCircle(centerX - width/2 + radius, centerY + height/2 - radius, radius, fill=fill)
+    drawCircle(centerX + width/2 - radius, centerY + height/2 - radius, radius, fill=fill)
 
 def intersectionRect(mouseX, mouseY, centerX, centerY, width, height):
-    left = centerX - width / 2
-    right = centerX + width / 2
-    top = centerY - height / 2
-    bottom = centerY + height / 2
+    left = centerX - width/2
+    right = centerX + width/2
+    top = centerY - height/2
+    bottom = centerY + height/2
     return left <= mouseX <= right and top <= mouseY <= bottom
 
 def main():
