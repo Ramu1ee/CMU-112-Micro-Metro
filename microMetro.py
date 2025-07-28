@@ -415,7 +415,7 @@ def game_onKeyPress(app, key):
     elif key == 'space' and not app.gameOver: #pause & unpause
         app.paused = not app.paused
     if key == 'escape':
-        setActiveScreen('menu')
+        setActiveScreen('start')
 
 def game_redrawAll(app):
     drawRect(0, 0, app.width, app.height, fill='lightGoldenrodYellow') #background
@@ -517,28 +517,102 @@ def game_redrawAll(app):
         drawLabel(f"You survived {app.timer // 60} seconds", app.width/2, app.height/2 + 35, size=20, fill='white', font='montserrat')
         drawLabel("Press SPACE to restart", app.width/2, app.height/2 + 90, size=20, fill='gray', bold=True, font='montserrat')
 
-def menu_onScreenActivate(app):
+def start_onScreenActivate(app):
     pass
 
-def menu_onMousePress(app, mouseX, mouseY):
-    if (mouseX < app.width/2 + 140 and mouseX > app.width/2 - 140 and
-        mouseY < app.height/2 + 240 and mouseY > app.height/2 + 160):
-        setActiveScreen('game')
+def start_onMousePress(app, mouseX, mouseY):
+    if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 200, 280, 80):
+        setActiveScreen('menu')
 
-def menu_redrawAll(app):
+def start_redrawAll(app):
     drawRect(0, 0, app.width, app.height, fill='aliceBlue') #background
     #Logo
     drawLabel('MICRO', app.width/2 - 200, app.height/2 - 140, fill=gradient('darkRed','crimson', start='bottom'), size=100, bold=True, font='montserrat')
     drawLabel('METRO', app.width/2 + 200, app.height/2 - 140, fill=gradient('darkRed','crimson',start='bottom'), size=100, bold=True, font='montserrat')
-    #Start button
+    #play button
     drawRect(app.width/2, app.height/2 + 200, 200, 80, fill='cornflowerBlue', align='center')
     drawCircle(app.width/2 - 100, app.height/2 + 200, 40, fill='cornflowerBlue')
     drawCircle(app.width/2 + 100, app.height/2 + 200, 40, fill='cornflowerBlue')
-    drawLabel("Start Game", app.width/2, app.height/2 + 200, fill='dimGray', size=40, bold=True, font='montserrat')
+    drawLabel("Play", app.width/2, app.height/2 + 200, fill='aliceBlue', size=40, bold=True, font='montserrat')
     #Score
     drawLabel(f'High Score: {app.highScore}', app.width/2, app.height/2 + 60, size=20, font='montserrat')
 
+def menu_onScreenActivate(app):
+    app.gameSelected = False
+    app.selectedMap = None
+    app.selectedDifficulty = None
+    app.mapButtons = [
+        {'label': 'New York', 'x': 250, 'y': 250 },
+        {'label': 'Tokyo', 'x': 650, 'y': 250 },
+        {'label': 'Hong Kong', 'x': 1050, 'y': 250 }
+    ]
+    app.difficultyButtons = [
+        {'label': 'Easy', 'x': 250, 'y': 550 },
+        {'label': 'Medium', 'x': 650, 'y': 550 },
+        {'label': 'Hard', 'x': 1050, 'y': 550 }
+    ]
+    app.buttonWidth = 300
+    app.buttonHeight = 180
+
+def menu_onMousePress(app, mouseX, mouseY):
+    for button in app.mapButtons:
+        if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
+            app.selectedMap = button['label']
+            break
+    for button in app.difficultyButtons:
+        if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
+            app.selectedDifficulty = button['label']
+            break
+    if app.selectedMap != None and app.selectedDifficulty != None:
+        app.gameSelected = True
+    if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 300, 280, 80) and app.gameSelected:
+        setActiveScreen('game')
+
+def menu_onKeyPress(app, key):
+    if key == 'escape':
+        setActiveScreen('start')
+    
+def menu_redrawAll(app):
+    drawRect(0, 0, app.width, app.height, fill='aliceBlue') #background
+    #Map selection UI
+    drawLabel("Select Map", 100, 100, fill='cornflowerBlue', size=40, font='montserrat', align='left')
+    for button in app.mapButtons:
+        color = 'cornflowerBlue' if app.selectedMap == button['label'] else 'lightGray'
+        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 40, color)
+        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat')
+    #Difficulty selection UI
+    drawLabel("Select Difficulty", 100, 400, fill='cornflowerBlue', size=40, font='montserrat', align='left')
+    for button in app.difficultyButtons:
+        color = 'cornflowerBlue' if app.selectedDifficulty == button['label'] else 'lightGray'
+        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 40, color)
+        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat')
+    #Launch game button
+    if app.gameSelected:
+        buttonColor = 'cornflowerBlue'
+    else:
+        buttonColor = 'lightGray'
+    drawRect(app.width/2, app.height/2 + 300, 200, 80, fill=buttonColor, align='center')
+    drawCircle(app.width/2 - 100, app.height/2 + 300, 40, fill=buttonColor)
+    drawCircle(app.width/2 + 100, app.height/2 + 300, 40, fill=buttonColor)
+    drawLabel("Play", app.width/2, app.height/2 + 300, fill='aliceBlue', size=40, bold=True, font='montserrat')
+
+def drawRoundedRect(centerX, centerY, width, height, radius, fill):
+    radius = min(abs(radius), width / 2, height / 2)
+    drawRect(centerX, centerY, width, height - 2 * radius, fill=fill, align='center')
+    drawRect(centerX, centerY, width - 2 * radius, height, fill=fill, align='center')
+    drawCircle(centerX - width / 2 + radius, centerY - height / 2 + radius, radius, fill=fill)
+    drawCircle(centerX + width / 2 - radius, centerY - height / 2 + radius, radius, fill=fill)
+    drawCircle(centerX - width / 2 + radius, centerY + height / 2 - radius, radius, fill=fill)
+    drawCircle(centerX + width / 2 - radius, centerY + height / 2 - radius, radius, fill=fill)
+
+def intersectionRect(mouseX, mouseY, centerX, centerY, width, height):
+    left = centerX - width / 2
+    right = centerX + width / 2
+    top = centerY - height / 2
+    bottom = centerY + height / 2
+    return left <= mouseX <= right and top <= mouseY <= bottom
+
 def main():
-    runAppWithScreens(initialScreen='game', width=1600, height=900)
+    runAppWithScreens(initialScreen='start', width=1600, height=900)
 
 main()
