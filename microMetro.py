@@ -279,30 +279,41 @@ class Train:
                 drawRegularPolygon(px, py, 4, 5, fill='white')
 
 def onAppStart(app):
+    #StartTheme from GarageBand
+    app.startTheme = Sound('sound/Start_theme.mp3')
+    #Royalty-free sound effects, downloaded long ago, forgot link
+    app.startSound = Sound('sound/continue.wav')
+    app.selectSound = Sound('sound/select.wav')
+    app.unselectSound = Sound('sound/unselect.wav')
+    app.gameOverSound = Sound('sound/game_over.wav')
+    app.connectSound = Sound('sound/connect.wav')
+    app.buttonSound = Sound('sound/button.wav')
+    app.exitSound = Sound('sound/exit.wav')
+    app.playSound = Sound('sound/play.wav')
+    app.pauseSound = Sound('sound/pause.wav')
     app.stepsPerSecond = 60
     app.highScore = 0
-    app.difficulty = None
-    app.map = None
 
 def game_onScreenActivate(app):
     app.stations = []
     app.lines = []
     app.selectedStation = None
     app.gameOver = False
+    app.gameOverSoundPlayed = False
     app.timer = 0
     #difficulty differences
-    if app.difficulty == 'Easy':
+    if app.selectedDifficulty == 'Easy':
         app.passengerSpawnRate = 180 #Starts every 3 seconds, gradually increases in freq
         app.stationSpawnRate = 660 #Every 11 seconds
         app.shapes = ['circle', 'square', 'triangle']
         app.colors = ['red', 'blue', 'green', 'orange', 'purple']
-    elif app.difficulty == 'Medium':
+    elif app.selectedDifficulty == 'Medium':
         app.passengerSpawnRate = 120 #Starts every 2 seconds, gradually increases in freq
         app.stationSpawnRate = 600 #Every 10 seconds
         app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
         app.colors = ['red', 'blue', 'green', 'orange', 'purple']
-    elif app.difficulty == 'Hard':
-        app.passengerSpawnRate = 90 #Starts every 1.5 seconds, gradually increases in freq
+    elif app.selectedDifficulty == 'Hard':
+        app.passengerSpawnRate = 10 #Starts every 1.5 seconds, gradually increases in freq
         app.stationSpawnRate = 540 #Every 9 seconds
         app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
         app.colors = ['red', 'blue', 'green']
@@ -320,6 +331,9 @@ def game_onScreenActivate(app):
 
 def game_onStep(app):
     if app.gameOver:
+        if not app.gameOverSoundPlayed:
+            app.gameOverSound.play(restart=True, loop=False)
+            app.gameOverSoundPlayed = True
         if app.highScore < app.timer:
             app.highScore = app.timer
         return
@@ -387,41 +401,52 @@ def game_onMousePress(app, mouseX, mouseY):
 
     if clickedStation:
         if not app.selectedStation:
+            app.selectSound.play(restart=True, loop=False)
             app.selectedStation = clickedStation #first click
         else:
             if app.selectedStation == clickedStation:
+                app.unselectSound.play(restart=True, loop=False)
                 app.selectedStation = None #clicked on same station again, unselect
                 return
             extendableLine, endpointStation, newStation = findExtendableLine(app, app.selectedStation, clickedStation)
             if extendableLine: #extend line
+                app.connectSound.play(restart=True, loop=False)
                 extendableLine.extendLine(newStation, endpointStation)
             else: #create new line
+                app.connectSound.play(restart=True, loop=False)
                 if len(app.lines) < len(app.colors):
                     color = app.colors[len(app.lines)]
                     new_line = Line(color)
                     new_line.linkStation(app.selectedStation)
                     new_line.linkStation(clickedStation)
                     app.lines.append(new_line)
-            app.selectedStation = None #clicked on empty space, unselect
+            app.selectedStation = None #unselect
     else:
-        app.selectedStation = None
+        app.unselectSound.play(restart=True, loop=False)
+        app.selectedStation = None #clicked on empty space, unselect
         
 def game_onKeyPress(app, key):
     if key == 'space' and app.gameOver: #restart game
+        app.startSound.play(restart=True, loop=False)
         game_onScreenActivate(app)
     elif key == 'space' and not app.gameOver: #pause & unpause
+        if app.paused:
+            app.playSound.play(restart=True, loop=False)
+        else:
+            app.pauseSound.play(restart=True, loop=False)
         app.paused = not app.paused
     if key == 'escape':
+        app.exitSound.play(restart=True, loop=False)
         setActiveScreen('start')
 
 def game_redrawAll(app):
     #map differences
-    if app.map == 'New York':
-        drawRect(0, 0, app.width, app.height, fill=rgb(179, 222, 245))
-    elif app.map == 'Tokyo':
-        drawRect(0, 0, app.width, app.height, fill=rgb(222, 245, 179))
-    elif app.map == 'Hong Kong':
-        drawRect(0, 0, app.width, app.height, fill=rgb(250, 218, 179))
+    if app.selectedMap == 'New York':
+        drawImage('img/NY_Map.jpg', 0, 0, width=app.width, height=app.height)
+    elif app.selectedMap == 'Tokyo':
+        drawImage('img/TK_Map.jpg', 0, 0, width=app.width, height=app.height)
+    elif app.selectedMap == 'Hong Kong':
+        drawImage('img/HK_Map.jpg', 0, 0, width=app.width, height=app.height)
 
     #AI - separating overlapping lines
     spacing = 8
@@ -482,7 +507,7 @@ def game_redrawAll(app):
                         drawRegularPolygon(station.x, station.y, station.radius + 12, 5, fill=None, border='blue', borderWidth=2)
 
     #UI
-    drawLabel("MICRO METRO", 220, 50, size=50, fill='gray', bold=True, font='montserrat')
+    drawLabel("MICRO METRO", 220, 50, size=50, fill='white', bold=True, font='montserrat', opacity=50)
     drawRect(0, app.height - 100, app.width, 100, fill='dimGray', opacity = 50)
     drawLabel("USED LINES:", 38, app.height - 75, size=20, fill='white', bold=True, font='montserrat', align='left')
     for i, color in enumerate(app.colors):
@@ -535,24 +560,27 @@ def findExtendableLine(app, station1, station2):
     return None, None, None
 
 def start_onScreenActivate(app):
-    pass
+    app.startButtonHover = False
+    app.startTheme.play(restart=False, loop=True)
+
+def start_onMouseMove(app, mouseX, mouseY):
+    if intersectionRect(mouseX, mouseY, app.width/2, 716, 600, 132):
+        app.startButtonHover = True
+    else:
+        app.startButtonHover = False
 
 def start_onMousePress(app, mouseX, mouseY):
-    if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 200, 280, 80):
+    if intersectionRect(mouseX, mouseY, app.width/2, 716, 600, 132):
+        app.startSound.play(restart=True, loop=False)
         setActiveScreen('menu')
 
 def start_redrawAll(app):
-    drawRect(0, 0, app.width, app.height, fill='aliceBlue') #background
-    #Logo
-    drawLabel('MICRO', app.width/2 - 200, app.height/2 - 140, fill=gradient('darkRed','crimson', start='bottom'), size=100, bold=True, font='montserrat')
-    drawLabel('METRO', app.width/2 + 200, app.height/2 - 140, fill=gradient('darkRed','crimson',start='bottom'), size=100, bold=True, font='montserrat')
-    #play button
-    drawRect(app.width/2, app.height/2 + 200, 200, 80, fill='cornflowerBlue', align='center')
-    drawCircle(app.width/2 - 100, app.height/2 + 200, 40, fill='cornflowerBlue')
-    drawCircle(app.width/2 + 100, app.height/2 + 200, 40, fill='cornflowerBlue')
-    drawLabel("Play", app.width/2, app.height/2 + 200, fill='aliceBlue', size=40, bold=True, font='montserrat')
+    if app.startButtonHover == True:
+        drawImage('img/Start_Screen_hover.jpg', 0, 0, width=app.width, height=app.height)
+    else:
+        drawImage('img/Start_Screen.jpg', 0, 0, width=app.width, height=app.height)
     #Score
-    drawLabel(f'High Score: {app.highScore}', app.width/2, app.height/2 + 60, size=20, font='montserrat')
+    drawLabel(f'High Score: {app.highScore}', app.width/2, 330, fill='white', size=35, bold=True, font='montserrat')
 
 def menu_onScreenActivate(app):
     app.selectedMap = 'New York'
@@ -574,20 +602,24 @@ def menu_onMousePress(app, mouseX, mouseY):
     #map button intersections
     for button in app.mapButtons:
         if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
+            app.buttonSound.play(restart=True, loop=False)
             app.selectedMap = button['label']
             break
     #difficulty button intersections
     for button in app.difficultyButtons:
         if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
+            app.buttonSound.play(restart=True, loop=False)
             app.selectedDifficulty = button['label']
             break
     if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 300, 280, 80):
-        app.difficulty = app.selectedDifficulty
-        app.map = app.selectedMap
         setActiveScreen('game')
+        app.startSound.play(restart=True, loop=False)
+        app.startTheme.pause()
 
 def menu_onKeyPress(app, key):
     if key == 'escape':
+        app.startTheme.pause()
+        app.exitSound.play(loop=False)
         setActiveScreen('start')
     
 def menu_redrawAll(app):
