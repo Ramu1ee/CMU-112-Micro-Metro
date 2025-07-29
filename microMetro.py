@@ -278,17 +278,34 @@ class Train:
             elif p.destinationShape == 'pentagon':
                 drawRegularPolygon(px, py, 4, 5, fill='white')
 
+def onAppStart(app):
+    app.stepsPerSecond = 60
+    app.highScore = 0
+    app.difficulty = None
+    app.map = None
+
 def game_onScreenActivate(app):
-    """Initialize or reset all game variables"""
     app.stations = []
     app.lines = []
-    app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
-    app.colors = ['red', 'blue', 'green', 'orange', 'purple']
     app.selectedStation = None
     app.gameOver = False
     app.timer = 0
-    app.passengerSpawnRate = 120 #Starts every 2 seconds, gradually increases
-    app.stationSpawnRate = 600 #Every 10 seconds
+    #difficulty differences
+    if app.difficulty == 'Easy':
+        app.passengerSpawnRate = 180 #Starts every 3 seconds, gradually increases in freq
+        app.stationSpawnRate = 660 #Every 11 seconds
+        app.shapes = ['circle', 'square', 'triangle']
+        app.colors = ['red', 'blue', 'green', 'orange', 'purple']
+    elif app.difficulty == 'Medium':
+        app.passengerSpawnRate = 120 #Starts every 2 seconds, gradually increases in freq
+        app.stationSpawnRate = 600 #Every 10 seconds
+        app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
+        app.colors = ['red', 'blue', 'green', 'orange', 'purple']
+    elif app.difficulty == 'Hard':
+        app.passengerSpawnRate = 90 #Starts every 1.5 seconds, gradually increases in freq
+        app.stationSpawnRate = 540 #Every 9 seconds
+        app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
+        app.colors = ['red', 'blue', 'green']
     app.segment_map = {}
     app.paused = False
     
@@ -300,10 +317,6 @@ def game_onScreenActivate(app):
     line.linkStation(app.stations[0])
     line.linkStation(app.stations[1])
     app.lines.append(line)
-
-def onAppStart(app):
-    app.stepsPerSecond = 60
-    app.highScore = 0
 
 def game_onStep(app):
     if app.gameOver:
@@ -362,22 +375,6 @@ def game_onStep(app):
         if len(station.passengers) > 8:
             app.gameOver = True
 
-def findExtendableLine(app, station1, station2):
-    #priority for first selected station
-    #checks if first selected line is valid
-    for line in station1.lines:
-        endpoints = line.getEndpoints()
-        if len(endpoints) == 2 and station1 in endpoints and station2 not in line.stations:
-            return line, station1, station2
-    
-    #checks if second selected line is valid
-    for line in station2.lines:
-        endpoints = line.getEndpoints()
-        if len(endpoints) == 2 and station2 in endpoints and station1 not in line.stations:
-            return line, station2, station1
-
-    return None, None, None
-
 def game_onMousePress(app, mouseX, mouseY):
     if app.gameOver:
         return
@@ -418,7 +415,14 @@ def game_onKeyPress(app, key):
         setActiveScreen('start')
 
 def game_redrawAll(app):
-    drawRect(0, 0, app.width, app.height, fill='lightGoldenrodYellow') #background
+    #map differences
+    if app.map == 'New York':
+        drawRect(0, 0, app.width, app.height, fill=rgb(179, 222, 245))
+    elif app.map == 'Tokyo':
+        drawRect(0, 0, app.width, app.height, fill=rgb(222, 245, 179))
+    elif app.map == 'Hong Kong':
+        drawRect(0, 0, app.width, app.height, fill=rgb(250, 218, 179))
+
     #AI - separating overlapping lines
     spacing = 8
     if hasattr(app, 'segment_map'):
@@ -429,15 +433,12 @@ def game_redrawAll(app):
                 offset_distance = (i - (n - 1) / 2.0) * spacing
                 dx, dy = s2.x - s1.x, s2.y - s1.y
                 dist = (dx**2 + dy**2)**0.5
-                if dist == 0: continue
-            
+                if dist == 0: continue   
                 perp_dx, perp_dy = -dy / dist, dx / dist
-            
                 x1_off = s1.x + offset_distance * perp_dx
                 y1_off = s1.y + offset_distance * perp_dy
                 x2_off = s2.x + offset_distance * perp_dx
                 y2_off = s2.y + offset_distance * perp_dy
-            
                 drawLine(x1_off, y1_off, x2_off, y2_off, fill=line.color, lineWidth=5)
 
     for line in app.lines:
@@ -482,7 +483,7 @@ def game_redrawAll(app):
 
     #UI
     drawLabel("MICRO METRO", 220, 50, size=50, fill='gray', bold=True, font='montserrat')
-    drawRect(0, app.height - 100, app.width, 100, fill='darkSlateGray')
+    drawRect(0, app.height - 100, app.width, 100, fill='dimGray', opacity = 50)
     drawLabel("USED LINES:", 38, app.height - 75, size=20, fill='white', bold=True, font='montserrat', align='left')
     for i, color in enumerate(app.colors):
         x = 50 + i * 50
@@ -517,6 +518,22 @@ def game_redrawAll(app):
         drawLabel(f"You survived {app.timer // 60} seconds", app.width/2, app.height/2 + 35, size=20, fill='white', font='montserrat')
         drawLabel("Press SPACE to restart", app.width/2, app.height/2 + 90, size=20, fill='gray', bold=True, font='montserrat')
 
+def findExtendableLine(app, station1, station2):
+    #priority for first selected station
+    #checks if first selected line is valid
+    for line in station1.lines:
+        endpoints = line.getEndpoints()
+        if len(endpoints) == 2 and station1 in endpoints and station2 not in line.stations:
+            return line, station1, station2
+    
+    #checks if second selected line is valid
+    for line in station2.lines:
+        endpoints = line.getEndpoints()
+        if len(endpoints) == 2 and station2 in endpoints and station1 not in line.stations:
+            return line, station2, station1
+
+    return None, None, None
+
 def start_onScreenActivate(app):
     pass
 
@@ -538,7 +555,6 @@ def start_redrawAll(app):
     drawLabel(f'High Score: {app.highScore}', app.width/2, app.height/2 + 60, size=20, font='montserrat')
 
 def menu_onScreenActivate(app):
-    app.gameSelected = False
     app.selectedMap = 'New York'
     app.selectedDifficulty = 'Easy'
     app.mapButtons = [
@@ -555,17 +571,19 @@ def menu_onScreenActivate(app):
     app.buttonHeight = 100
 
 def menu_onMousePress(app, mouseX, mouseY):
+    #map button intersections
     for button in app.mapButtons:
         if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
             app.selectedMap = button['label']
             break
+    #difficulty button intersections
     for button in app.difficultyButtons:
         if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
             app.selectedDifficulty = button['label']
             break
-    if app.selectedMap != None and app.selectedDifficulty != None:
-        app.gameSelected = True
-    if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 300, 280, 80) and app.gameSelected:
+    if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 300, 280, 80):
+        app.difficulty = app.selectedDifficulty
+        app.map = app.selectedMap
         setActiveScreen('game')
 
 def menu_onKeyPress(app, key):
@@ -573,41 +591,37 @@ def menu_onKeyPress(app, key):
         setActiveScreen('start')
     
 def menu_redrawAll(app):
-    # 1. Define highlight color based on selected difficulty
+    #color adjustment according to difficulty
     colorMap = {
         'Easy': rgb(230, 250, 255),
         'Medium': rgb(255, 255, 224),
         'Hard': rgb(255, 230, 240)
     }
-    # Default to cornflowerBlue if no difficulty is selected yet
-    highlightColor = colorMap.get(app.selectedDifficulty, 'cornflowerBlue')
+    highlightColor = colorMap.get(app.selectedDifficulty)
 
-    # Background Image (no changes)
+    #background Image
     if app.selectedMap == 'New York':
-        drawImage('code/CMU Term project/img/NY.jpg', 0, 0, width=app.width, height=app.height)
+        drawImage('img/NY.jpg', 0, 0, width=app.width, height=app.height)
     elif app.selectedMap == 'Tokyo':
-        drawImage('code/CMU Term project/img/TK.jpg', 0, 0, width=app.width, height=app.height)
+        drawImage('img/TK.jpg', 0, 0, width=app.width, height=app.height)
     elif app.selectedMap == 'Hong Kong':
-        drawImage('code/CMU Term project/img/HK.jpg', 0, 0, width=app.width, height=app.height)
+        drawImage('img/HK.jpg', 0, 0, width=app.width, height=app.height)
     
-    # Map selection UI
+    #map selection UI
     drawLabel("Select Map", 100, 100, fill='aliceBlue', size=40, bold=True, font='montserrat', align='left')
     for button in app.mapButtons:
-        # 2. Use the dynamic highlightColor
         color = highlightColor if app.selectedMap == button['label'] else 'darkGray'
         drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
         drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
 
-    # Difficulty selection UI
+    #difficulty selection UI
     drawLabel("Select Difficulty", 100, 400, fill='aliceBlue', size=40, font='montserrat', bold=True, align='left')
     for button in app.difficultyButtons:
-        # 3. Use the dynamic highlightColor here as well
         color = highlightColor if app.selectedDifficulty == button['label'] else 'darkGray'
         drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
         drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
 
-    # Launch game button
-    # 4. Use the dynamic highlightColor for the start button
+    #launch game button
     drawRect(app.width/2, app.height/2 + 300, 200, 80, fill=highlightColor, align='center')
     drawCircle(app.width/2 - 100, app.height/2 + 300, 40, fill=highlightColor)
     drawCircle(app.width/2 + 100, app.height/2 + 300, 40, fill=highlightColor)
