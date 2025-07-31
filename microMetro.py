@@ -42,17 +42,16 @@ def findPathBFS(startStation, destinationShape):
 def findTransfer(startStation, destinationShape):
     path = findPathBFS(startStation, destinationShape)
     #Return list of stations to pass through
-    if not path or len(path) < 3: #no transfer needed, curr or next station is destination
+    if not path or len(path) < 3: #No transfer needed, curr or next station is destination
         return None
     currentLines = set(path[0].lines) & set(path[1].lines) #Current possible lines
-    #Iterate through the path to find the first mandatory transfer station.
+    #Iterate through the path returned to find weather transfer is need
     for i in range(1, len(path) - 1):
         currentHeading = path[i]
         nextHeading = path[i+1]
-        nextLines = set(currentHeading.lines) & set(nextHeading.lines) # Possible lines afterwards
+        nextLines = set(currentHeading.lines) & set(nextHeading.lines) #Possible lines afterwards
         if not currentLines & nextLines: #No single line possible
             return currentHeading
-        #Otherwise, continue
         currentLines = currentLines & nextLines
     #No transfer needed
     return None
@@ -107,17 +106,15 @@ class Line:
         self.color = color
         self.trains = []
 
-    #Create a line
-    def linkStation(self, station):
+    def linkStation(self, station): #Create a line
         if station not in self.stations: #You cant add the same station twice for a line
-            self.stations.append(station) #adds station to line
-            station.lines.append(self) #adds line to station
+            self.stations.append(station) #Adds station to line
+            station.lines.append(self) #Adds line to station
             #Condition for train existing
             if len(self.stations) == 2:
                 self.trains.append(Train(self, 0))
 
-    #Extend a line
-    def extendLine(self, newStation, endStation):
+    def extendLine(self, newStation, endStation): #Extend a line
         if newStation in self.stations or endStation not in self.getEndpoints(): #Wrong conditions
             return
         if self.stations[0] == endStation: #Beginning of line
@@ -173,8 +170,8 @@ class Train:
             self.waitTimer = 60 #1 second
             return deliveredCount
         else: #Move
-            self.x += self.speed * dx / distance
-            self.y += self.speed * dy / distance
+            self.x += (self.speed * dx) / distance
+            self.y += (self.speed * dy) / distance
             return 0
 
     #Drop and take passengers
@@ -193,7 +190,7 @@ class Train:
         transferPassengers = []
         remainingPassengers = []
         for passenger in self.passengers:
-            if hasattr(passenger, 'transferStation') and passenger.transferStation == currentStation:
+            if passenger.transferStation == currentStation:
                 transferPassengers.append(passenger)
             else:
                 remainingPassengers.append(passenger)
@@ -230,7 +227,7 @@ class Train:
             drawRect(self.x - 15, self.y - 7, 30, 14, fill=self.line.color, border='black', borderWidth=2) #Train
             return
     
-        #Gemini AI - placing trains on correct track
+        #Gemini AI - placing trains on correct track when multiple tracks exists on a segment
         targetStation = self.line.stations[self.targetIndex]
         startingStation = self.line.stations[startingIndex]
         segment = tuple(sorted((startingStation, targetStation), key=id))
