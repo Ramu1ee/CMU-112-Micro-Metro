@@ -463,15 +463,10 @@ def game_onScreenActivate(app):
         app.stations.append(Station(900, 600, 'triangle'))
 
 def game_onStep(app):
-    if app.paused:
-        return
-
     if app.gameOver:
         if not app.gameOverSoundPlayed: #Play sound only once
             app.gameOverSound.play(restart=True, loop=False)
             app.gameOverSoundPlayed = True
-        if app.highScore < app.timer:
-            app.highScore = app.passengersTrips #High score based on passengers delivered
         return
     app.timer += 1
 
@@ -492,6 +487,9 @@ def game_onStep(app):
     for segment in segment_map:
         segment_map[segment].sort(key=lambda l: l.color)
     app.segment_map = segment_map
+
+    if app.paused:
+        return
     
     for line in app.lines: #Animate trains
         for train in line.trains:
@@ -569,7 +567,7 @@ def game_onKeyPress(app, key):
     elif key == 'p':
         app.gameTheme.pause()
     if key == 'escape':
-        if app.highScore < app.timer:
+        if app.highScore < app.passengersTrips:
             app.highScore = app.passengersTrips #High score based on passengers delivered
         app.gameTheme.pause()
         app.exitSound.play(restart=True, loop=False)
