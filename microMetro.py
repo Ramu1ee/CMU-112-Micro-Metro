@@ -1,15 +1,17 @@
+#Game inspired by Mini Metro
+
 from cmu_graphics import *
 import random
 from collections import deque
 
 #Gemini AI designed this breadth first search function to find a transfer path if line does not reach target
 #Also imported deque
-def findPathBFS(start_station, destination_shape):
-    queue = deque([(start_station, [start_station])])
-    visited = {start_station}
+def findPathBFS(startStation, destinationShape):
+    queue = deque([(startStation, [startStation])])
+    visited = {startStation}
 
-    if start_station.shape == destination_shape:
-        return [start_station]
+    if startStation.shape == destinationShape:
+        return [startStation]
 
     while queue:
         currentHeading, path = queue.popleft()
@@ -29,7 +31,7 @@ def findPathBFS(start_station, destination_shape):
         for neighbor in neighbors:
             if neighbor not in visited:
                 new_path = path + [neighbor]
-                if neighbor.shape == destination_shape:
+                if neighbor.shape == destinationShape:
                     return new_path  # Found the shortest path
                 
                 visited.add(neighbor)
@@ -150,9 +152,9 @@ class Train:
     def move(self):
         if self.waitTimer > 0:
             self.waitTimer -= 1
-            return
+            return 0
         if len(self.line.stations) < 2:
-            return
+            return 0
     
         targetStation = self.line.stations[self.targetIndex]
         dx = targetStation.x - self.x
@@ -161,7 +163,7 @@ class Train:
         if distance < self.speed: #Arrived, snap to target
             self.x, self.y = targetStation.x, targetStation.y
             self.currentIndex = self.targetIndex
-            self.handlePassengers()
+            deliveredCount = self.handlePassengers()
             #Flip directions at ends
             if self.targetIndex == len(self.line.stations) - 1:
                 self.direction = -1
@@ -169,15 +171,24 @@ class Train:
                 self.direction = 1
             self.targetIndex += self.direction
             self.waitTimer = 60 #1 second
+            return deliveredCount
         else: #Move
             self.x += self.speed * dx / distance
             self.y += self.speed * dy / distance
+            return 0
 
     #Drop and take passengers
     def handlePassengers(self):
+        deliveredCount = 0
         currentStation = self.line.stations[self.currentIndex]
         #Drop off passengers at their right shape
-        self.passengers = [passenger for passenger in self.passengers if passenger.destinationShape != currentStation.shape]
+        tempPassengers = self.passengers.copy()
+        self.passengers.clear()
+        for passenger in tempPassengers:
+            if passenger.destinationShape != currentStation.shape:
+                self.passengers.append(passenger) #If not destination
+            else:
+                deliveredCount += 1 #Reached! add count
         #Drop off passengers who need to transfer
         transferPassengers = []
         remainingPassengers = []
@@ -211,16 +222,18 @@ class Train:
                         self.passengers.append(passenger)
                         currentStation.passengers.remove(passenger)
 
+        return deliveredCount
+
     def draw(self, app):
-        s2 = self.line.stations[self.targetIndex]
-        s1_index = self.targetIndex - self.direction
-        if not (0 <= s1_index < len(self.line.stations)):
+        startingIndex = self.targetIndex - self.direction
+        if not (0 <= startingIndex < len(self.line.stations)):
             drawRect(self.x - 15, self.y - 7, 30, 14, fill=self.line.color, border='black', borderWidth=2) #Train
             return
     
         #Gemini AI - placing trains on correct track
-        s1 = self.line.stations[s1_index]
-        segment = tuple(sorted((s1, s2), key=id))
+        targetStation = self.line.stations[self.targetIndex]
+        startingStation = self.line.stations[startingIndex]
+        segment = tuple(sorted((startingStation, targetStation), key=id))
         offset_distance = 0
         if hasattr(app, 'segment_map') and segment in app.segment_map:
             shared_lines = app.segment_map[segment]
@@ -289,7 +302,7 @@ def start_onMouseMove(app, mouseX, mouseY):
         app.startButtonHover = False
 
 def start_onMousePress(app, mouseX, mouseY):
-    #'Fake' image button
+    #'Fake' image button intersection
     if intersectionRect(mouseX, mouseY, app.width/2, 716, 600, 132):
         app.startSound.play(restart=True, loop=False)
         setActiveScreen('menu')
@@ -399,6 +412,7 @@ def game_onScreenActivate(app):
     app.gameOver = False
     app.gameOverSoundPlayed = False
     app.timer = 0
+    app.passengersTrips = 0
     #Difficulty settings
     if app.selectedDifficulty == 'Easy':
         app.passengerSpawnRate = 140 #Starts every 2.33 seconds, gradually increases in freq
@@ -417,7 +431,7 @@ def game_onScreenActivate(app):
         app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
         app.colors = ['red', 'blue', 'green', 'orange', 'purple']
     elif app.selectedDifficulty == 'Hard':
-        app.passengerSpawnRate = 10 #Starts every 1.33 seconds, gradually increases in freq
+        app.passengerSpawnRate = 80 #Starts every 1.33 seconds, gradually increases in freq
         app.stationSpawnRate = 540 #Every 9 seconds
         app.stationLimit = 30
         app.spawnLimit = 10
@@ -457,7 +471,7 @@ def game_onStep(app):
             app.gameOverSound.play(restart=True, loop=False)
             app.gameOverSoundPlayed = True
         if app.highScore < app.timer:
-            app.highScore = app.timer #High score based on time survived
+            app.highScore = app.passengersTrips #High score based on passengers delivered
         return
     app.timer += 1
 
@@ -481,7 +495,8 @@ def game_onStep(app):
     
     for line in app.lines: #Animate trains
         for train in line.trains:
-            train.move()
+            deliveredPassengers = train.move()
+            app.passengersTrips += deliveredPassengers
 
     if app.timer % app.passengerSpawnRate == 0 and app.stations: #Spawn passengers
         startStation = random.choice(app.stations)
@@ -516,17 +531,17 @@ def game_onMousePress(app, mouseX, mouseY):
     if clickedStation:
         if not app.selectedStation:
             app.selectSound.play(restart=True, loop=False)
-            app.selectedStation = clickedStation #first click
+            app.selectedStation = clickedStation #First click
         else:
             if app.selectedStation == clickedStation:
                 app.unselectSound.play(restart=True, loop=False)
-                app.selectedStation = None #clicked on same station again, unselect
+                app.selectedStation = None #Clicked on same station again, unselect
                 return
             extendableLine, endpointStation, newStation = findExtendableLine(app.selectedStation, clickedStation)
-            if extendableLine and app.forceNewLine == False: #extend line
+            if extendableLine and app.forceNewLine == False: #Extend line
                 app.connectSound.play(restart=True, loop=False)
                 extendableLine.extendLine(newStation, endpointStation)
-            else: #create new line
+            else: #Create new line
                 if len(app.lines) < len(app.colors):
                     app.connectSound.play(restart=True, loop=False)
                     color = app.colors[len(app.lines)]
@@ -536,16 +551,16 @@ def game_onMousePress(app, mouseX, mouseY):
                     app.lines.append(new_line)
                 else:
                     app.gameOverSound.play(restart=True, loop=False)
-            app.selectedStation = None #unselect
+            app.selectedStation = None #Unselect
     else:
         app.unselectSound.play(restart=True, loop=False)
-        app.selectedStation = None #clicked on empty space, unselect
+        app.selectedStation = None #Clicked on empty space, unselect
         
 def game_onKeyPress(app, key):
-    if key == 'space' and app.gameOver: #restart game
+    if key == 'space' and app.gameOver: #Restart game
         app.startSound.play(restart=True, loop=False)
         game_onScreenActivate(app)
-    elif key == 'space' and not app.gameOver: #pause & unpause
+    elif key == 'space' and not app.gameOver: #Pause & unpause
         if app.paused:
             app.playSound.play(restart=True, loop=False)
         else:
@@ -554,6 +569,8 @@ def game_onKeyPress(app, key):
     elif key == 'p':
         app.gameTheme.pause()
     if key == 'escape':
+        if app.highScore < app.timer:
+            app.highScore = app.passengersTrips #High score based on passengers delivered
         app.gameTheme.pause()
         app.exitSound.play(restart=True, loop=False)
         setActiveScreen('start')
@@ -575,7 +592,7 @@ def game_redrawAll(app):
     elif app.selectedMap == 'Hong Kong':
         drawImage('img/HK_Map.jpg', 0, 0, width=app.width, height=app.height)
 
-    #AI - separating overlapping lines
+    #Gemini AI - separating overlapping lines
     spacing = 8
     if hasattr(app, 'segment_map'):
         for segment, lines in app.segment_map.items():
@@ -650,8 +667,8 @@ def game_redrawAll(app):
     drawLabel(f"Waiting Passengers: {total_passengers}", app.width - 60, app.height - 80, size=16, fill='white', bold=True, align='right', font='montserrat')
     drawLabel(f"Time: {app.timer // 60}s", app.width - 60, app.height - 60, size=16, fill='white', align='right', font='montserrat')
     drawLabel(f"Stations: {len(app.stations)}", app.width - 60, app.height - 40, size=16, fill='white', align='right', font='montserrat')
-    drawLabel(f"Lines: {len(app.lines)}", app.width - 60, app.height - 20, size=16, fill='white', align='right', font='montserrat')
-    drawLabel(f"Passenger demand: {1/(app.passengerSpawnRate/180):.2f}", app.width/2, app.height - 80, size=20, fill='paleGreen', bold=True, align='center', font='montserrat')
+    drawLabel(f"Passenger demand: {1/(app.passengerSpawnRate/180):.2f}", app.width - 60, app.height - 20, size=16, fill='white', align='right', font='montserrat')
+    drawLabel(f"Passengers trips: {app.passengersTrips}", app.width/2, app.height - 80, size=20, fill='paleGreen', bold=True, align='center', font='montserrat')
 
     if app.selectedStation: #Connection key
         drawLabel("Click another station to connect", app.width//2, 50, size=18, fill='black', bold=True, font='montserrat')
@@ -667,18 +684,18 @@ def game_redrawAll(app):
         drawRect(app.width/2 - 200, app.height/2 - 75, 400, 150, fill='maroon', opacity=50)
         drawLabel("RIOTS!", app.width/2, app.height/2 - 30, size=40, fill='white', bold=True, font='montserrat')
         drawLabel("A station became overcrowded!", app.width/2, app.height/2 + 10, size=20, fill='white', font='montserrat')
-        drawLabel(f"You survived {app.timer // 60} seconds", app.width/2, app.height/2 + 35, size=20, fill='white', font='montserrat')
+        drawLabel(f"{app.passengersTrips} trips were made", app.width/2, app.height/2 + 35, size=20, fill='white', font='montserrat')
         drawLabel("Press SPACE to restart", app.width/2, app.height/2 + 90, size=20, fill='gray', bold=True, font='montserrat')
 
 def findExtendableLine(station1, station2):
-    #priority for first selected station
-    #checks if first selected line is valid
+    #Priority for first selected station
+    #Checks if first selected line is valid
     for line in station1.lines:
         endpoints = line.getEndpoints()
         if len(endpoints) == 2 and station1 in endpoints and station2 not in line.stations:
             return line, station1, station2
     
-    #checks if second selected line is valid
+    #Checks if second selected line is valid
     for line in station2.lines:
         endpoints = line.getEndpoints()
         if len(endpoints) == 2 and station2 in endpoints and station1 not in line.stations:
