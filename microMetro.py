@@ -45,7 +45,7 @@ def findTransfer(startStation, destinationShape):
     if not path or len(path) < 3: #No transfer needed, curr or next station is destination
         return None
     currentLines = set(path[0].lines) & set(path[1].lines) #Current possible lines
-    #Iterate through the path returned to find weather transfer is need
+    #Iterate through the path returned to find whether transfer is need
     for i in range(1, len(path) - 1):
         currentHeading = path[i]
         nextHeading = path[i+1]
