@@ -2,6 +2,60 @@ from cmu_graphics import *
 import random
 from collections import deque
 
+#Gemini AI designed this breadth first search function to find a transfer path if line does not reach target
+#Also imported deque
+def findPathBFS(start_station, destination_shape):
+    queue = deque([(start_station, [start_station])])
+    visited = {start_station}
+
+    if start_station.shape == destination_shape:
+        return [start_station]
+
+    while queue:
+        currentHeading, path = queue.popleft()
+
+        # Find adjacent stations to currentHeading
+        neighbors = set()
+        for line in currentHeading.lines:
+            try:
+                idx = line.stations.index(currentHeading)
+                if idx > 0:
+                    neighbors.add(line.stations[idx - 1])
+                if idx < len(line.stations) - 1:
+                    neighbors.add(line.stations[idx + 1])
+            except ValueError:
+                continue
+        
+        for neighbor in neighbors:
+            if neighbor not in visited:
+                new_path = path + [neighbor]
+                if neighbor.shape == destination_shape:
+                    return new_path  # Found the shortest path
+                
+                visited.add(neighbor)
+                queue.append((neighbor, new_path))
+    
+    return None  # No path found
+
+def findTransfer(startStation, destinationShape):
+    path = findPathBFS(startStation, destinationShape)
+    #Return list of stations to pass through
+    if not path or len(path) < 3: #no transfer needed, curr or next station is destination
+        return None
+    currentLines = set(path[0].lines) & set(path[1].lines) #Current possible lines
+    #Iterate through the path to find the first mandatory transfer station.
+    for i in range(1, len(path) - 1):
+        currentHeading = path[i]
+        nextHeading = path[i+1]
+        nextLines = set(currentHeading.lines) & set(nextHeading.lines) # Possible lines afterwards
+        if not currentLines & nextLines: #No single line possible
+            return currentHeading
+        #Otherwise, continue
+        currentLines = currentLines & nextLines
+    #No transfer needed
+    return None
+
+
 class Station:
     def __init__(self, x, y, shape):
         self.x = x
@@ -29,21 +83,21 @@ class Station:
             posX = self.x - 20 + (i % 5) * 10
             posY = self.y + 30 + (i // 5) * 10
             if passenger.destinationShape == 'circle':
-                drawCircle(posX, posY, 4, fill='Gray')
+                drawCircle(posX, posY, 4.5, fill='Gray')
             elif passenger.destinationShape == 'square':
                 drawRegularPolygon(posX, posY, 6, 4, fill='Gray', rotateAngle=45)
             elif passenger.destinationShape == 'triangle':
-                drawRegularPolygon(posX, posY, 6, 3, fill='Gray')
+                drawRegularPolygon(posX, posY+1, 6, 3, fill='Gray')
             elif passenger.destinationShape == 'diamond':
                 drawRegularPolygon(posX, posY, 6, 4, fill='Gray')
             elif passenger.destinationShape == 'pentagon':
-                drawRegularPolygon(posX, posY, 6, 5, fill='Gray')
+                drawRegularPolygon(posX, posY, 5, 5, fill='Gray')
 
 class Passenger:
     #Passenger shape is determined by the destination
     def __init__(self, destinationShape):
         self.destinationShape = destinationShape
-        self.transferStation = None  # Station where passenger should transfer
+        self.transferStation = None  #Station where passenger should transfer
 
 class Line:
     def __init__(self, color):
@@ -53,24 +107,23 @@ class Line:
 
     #Create a line
     def linkStation(self, station):
-        #You cant add the same station twice for a line
-        if station not in self.stations:
+        if station not in self.stations: #You cant add the same station twice for a line
             self.stations.append(station) #adds station to line
             station.lines.append(self) #adds line to station
             #Condition for train existing
-            if len(self.stations) == 2 and not self.trains:
+            if len(self.stations) == 2:
                 self.trains.append(Train(self, 0))
 
     #Extend a line
     def extendLine(self, newStation, endStation):
-        if newStation in self.stations or endStation not in self.getEndpoints():
+        if newStation in self.stations or endStation not in self.getEndpoints(): #Wrong conditions
             return
-        if self.stations[0] == endStation:
+        if self.stations[0] == endStation: #Beginning of line
             self.stations.insert(0, newStation)
-            for train in self.trains:
+            for train in self.trains: #Adjust relative train position
                 train.currentIndex += 1
                 train.targetIndex += 1
-        elif self.stations[-1] == endStation:
+        elif self.stations[-1] == endStation: #End of line
             self.stations.append(newStation)
         newStation.lines.append(self)
 
@@ -82,82 +135,17 @@ class Line:
         for train in self.trains:
             train.draw(app)
 
-#AI
-def _find_path_bfs(start_station, destination_shape):
-    queue = deque([(start_station, [start_station])])
-    visited = {start_station}
-
-    if start_station.shape == destination_shape:
-        return [start_station]
-
-    while queue:
-        current_station, path = queue.popleft()
-
-        # Find adjacent stations to current_station
-        neighbors = set()
-        for line in current_station.lines:
-            try:
-                idx = line.stations.index(current_station)
-                if idx > 0:
-                    neighbors.add(line.stations[idx - 1])
-                if idx < len(line.stations) - 1:
-                    neighbors.add(line.stations[idx + 1])
-            except ValueError:
-                continue
-        
-        for neighbor in neighbors:
-            if neighbor not in visited:
-                new_path = path + [neighbor]
-                if neighbor.shape == destination_shape:
-                    return new_path  # Found the shortest path
-                
-                visited.add(neighbor)
-                queue.append((neighbor, new_path))
-    
-    return None  # No path found
-
-#AI
-def findTransferRoute(startStation, destinationShape):
-    path = _find_path_bfs(startStation, destinationShape)
-
-    if not path or len(path) < 3:
-        # No path exists, or the path is direct (no transfers needed).
-        return None
-
-    # Determine the lines for the first leg of the journey.
-    lines_for_current_leg = set(path[0].lines) & set(path[1].lines)
-    if not lines_for_current_leg:
-        return None # Should not happen with a valid path
-
-    # Iterate through the path to find the first mandatory transfer station.
-    for i in range(1, len(path) - 1):
-        current_station = path[i]
-        next_station = path[i+1]
-
-        lines_for_next_leg = set(current_station.lines) & set(next_station.lines)
-
-        # If there are no shared lines between the current leg and the next,
-        # a transfer is required at the current station.
-        if not lines_for_current_leg.intersection(lines_for_next_leg):
-            return current_station
-
-        # Otherwise, continue on the shared lines.
-        lines_for_current_leg = lines_for_current_leg.intersection(lines_for_next_leg)
-
-    # If the loop completes, the entire journey can be made on at least one line.
-    return None
-
 class Train:
     def __init__(self, line, startIndex):
         self.line = line
-        self.currentIndex = startIndex #station train is from
+        self.currentIndex = startIndex #Station train is from
         self.passengers = []
         self.capacity = 6
         self.x, self.y = self.line.stations[startIndex].x, self.line.stations[startIndex].y
-        self.targetIndex = (startIndex + 1) % len(self.line.stations) if len(self.line.stations) > 0 else 0
+        self.targetIndex = startIndex+1 % len(self.line.stations) #Wrap around
         self.speed = 1.5
         self.direction = 1
-        self.waitTimer = 0 #for stopping at stations
+        self.waitTimer = 0 #For stopping at stations
 
     def move(self):
         if self.waitTimer > 0:
@@ -166,80 +154,73 @@ class Train:
         if len(self.line.stations) < 2:
             return
     
-        target_station = self.line.stations[self.targetIndex]
-        dx = target_station.x - self.x
-        dy = target_station.y - self.y
-        dist = (dx**2 + dy**2)**0.5
-        if dist < self.speed: #arrived, snap to target
-            self.x, self.y = target_station.x, target_station.y
+        targetStation = self.line.stations[self.targetIndex]
+        dx = targetStation.x - self.x
+        dy = targetStation.y - self.y
+        distance = (dx**2 + dy**2)**0.5
+        if distance < self.speed: #Arrived, snap to target
+            self.x, self.y = targetStation.x, targetStation.y
             self.currentIndex = self.targetIndex
             self.handlePassengers()
-            #flip directions at ends
+            #Flip directions at ends
             if self.targetIndex == len(self.line.stations) - 1:
                 self.direction = -1
             elif self.targetIndex == 0:
                 self.direction = 1
             self.targetIndex += self.direction
             self.waitTimer = 60 #1 second
-        else: #move
-            self.x += self.speed * dx / dist
-            self.y += self.speed * dy / dist
+        else: #Move
+            self.x += self.speed * dx / distance
+            self.y += self.speed * dy / distance
 
-    #drop and take passengers
+    #Drop and take passengers
     def handlePassengers(self):
         currentStation = self.line.stations[self.currentIndex]
-        
-        # Drop off passengers at their final destination
-        self.passengers = [p for p in self.passengers if p.destinationShape != currentStation.shape]
-        
-        # Drop off passengers who need to transfer at this station
-        passengers_to_transfer = []
-        remaining_passengers = []
-        for p in self.passengers:
-            if hasattr(p, 'transferStation') and p.transferStation == currentStation:
-                passengers_to_transfer.append(p)
+        #Drop off passengers at their right shape
+        self.passengers = [passenger for passenger in self.passengers if passenger.destinationShape != currentStation.shape]
+        #Drop off passengers who need to transfer
+        transferPassengers = []
+        remainingPassengers = []
+        for passenger in self.passengers:
+            if hasattr(passenger, 'transferStation') and passenger.transferStation == currentStation:
+                transferPassengers.append(passenger)
             else:
-                remaining_passengers.append(p)
+                remainingPassengers.append(passenger)
+        self.passengers = remainingPassengers
         
-        self.passengers = remaining_passengers
+        #Add transfer passengers to the station
+        for passenger in transferPassengers:
+            passenger.transferStation = None
+            currentStation.passengers.append(passenger)
         
-        # Add transfer passengers to the station
-        for p in passengers_to_transfer:
-            p.transferStation = None  # Reset transfer station
-            currentStation.passengers.append(p)
-        
-        # Pick up passengers from the station
-        for passenger in list(currentStation.passengers):
+        #Pick up passengers from the station
+        for passenger in currentStation.passengers.copy():
             if len(self.passengers) < self.capacity:
-                # Check if destination is directly reachable on this line
-                destinationAvailable = any(s.shape == passenger.destinationShape for s in self.line.stations)
-                
+                #Check if destination is directly reachable
+                destinationAvailable = any(station.shape == passenger.destinationShape for station in self.line.stations)
                 if destinationAvailable:
-                    # Direct route - pick up passenger
+                    #Direct route - pick up passenger
                     self.passengers.append(passenger)
                     currentStation.passengers.remove(passenger)
                 else:
-                    # Check if we can find a transfer route
-                    transferStation = findTransferRoute(currentStation, passenger.destinationShape)
+                    #Check if we can find a transfer route
+                    transferStation = findTransfer(currentStation, passenger.destinationShape)
                     if transferStation and transferStation in self.line.stations:
-                        # Pick up passenger and set their transfer station
+                        #Pick up passenger and set their transfer station
                         passenger.transferStation = transferStation
                         self.passengers.append(passenger)
                         currentStation.passengers.remove(passenger)
 
     def draw(self, app):
-        if len(self.line.stations) < 2: return
-
         s2 = self.line.stations[self.targetIndex]
         s1_index = self.targetIndex - self.direction
         if not (0 <= s1_index < len(self.line.stations)):
             drawRect(self.x - 15, self.y - 7, 30, 14, fill=self.line.color, border='black', borderWidth=2) #Train
             return
     
+        #Gemini AI - placing trains on correct track
         s1 = self.line.stations[s1_index]
         segment = tuple(sorted((s1, s2), key=id))
-    
-        #AI - placing trains on correct track
         offset_distance = 0
         if hasattr(app, 'segment_map') and segment in app.segment_map:
             shared_lines = app.segment_map[segment]
@@ -248,21 +229,18 @@ class Train:
                 line_index = shared_lines.index(self.line)
                 spacing = 8
                 offset_distance = (line_index - (n - 1) / 2.0) * spacing
-
         s_start, s_end = segment[0], segment[1]
         dx = s_end.x - s_start.x
         dy = s_end.y - s_start.y
         dist = (dx**2 + dy**2)**0.5
-    
         draw_x, draw_y = self.x, self.y
         if dist > 0:
-            # Calculate the perpendicular vector for the offset
             perp_dx = -dy / dist
             perp_dy = dx / dist
             draw_x += offset_distance * perp_dx
             draw_y += offset_distance * perp_dy
 
-        # draw train and its passengers
+        #Draw train and its passengers
         drawRect(draw_x - 15, draw_y - 7, 30, 14, fill=self.line.color, border='black', borderWidth=2)
         for i, p in enumerate(self.passengers):
             px = draw_x - 10 + (i % 3) * 10
@@ -278,9 +256,13 @@ class Train:
             elif p.destinationShape == 'pentagon':
                 drawRegularPolygon(px, py, 4, 5, fill='white')
 
+
 def onAppStart(app):
-    #StartTheme from GarageBand
+    #Themes from GarageBand
     app.startTheme = Sound('sound/Start_theme.mp3')
+    app.hongKongTheme = Sound('sound/HongKong.mp3')
+    app.tokyoTheme = Sound('sound/Tokyo.mp3')
+    app.newYorkTheme = Sound('sound/NewYork.mp3')
     #Royalty-free sound effects, downloaded long ago, forgot link
     app.startSound = Sound('sound/continue.wav')
     app.selectSound = Sound('sound/select.wav')
@@ -294,6 +276,122 @@ def onAppStart(app):
     app.stepsPerSecond = 60
     app.highScore = 0
 
+
+def start_onScreenActivate(app):
+    app.startButtonHover = False
+    app.startTheme.play(restart=False, loop=True)
+
+def start_onMouseMove(app, mouseX, mouseY):
+    #'Fake' hover effect
+    if intersectionRect(mouseX, mouseY, app.width/2, 716, 600, 132):
+        app.startButtonHover = True
+    else:
+        app.startButtonHover = False
+
+def start_onMousePress(app, mouseX, mouseY):
+    #'Fake' image button
+    if intersectionRect(mouseX, mouseY, app.width/2, 716, 600, 132):
+        app.startSound.play(restart=True, loop=False)
+        setActiveScreen('menu')
+
+def start_redrawAll(app):
+    #Start menu image source from Google, edited in Pixelmator
+    if app.startButtonHover == True:
+        drawImage('img/Start_Screen_hover.jpg', 0, 0, width=app.width, height=app.height)
+    else:
+        drawImage('img/Start_Screen.jpg', 0, 0, width=app.width, height=app.height)
+    #Score
+    drawLabel(f'High Score: {app.highScore}', app.width/2, 330, fill='white', size=35, bold=True, font='montserrat')
+
+
+def menu_onScreenActivate(app):
+    #Default options
+    app.selectedMap = 'New York'
+    app.selectedDifficulty = 'Easy'
+    app.mapButtons = [
+        {'label': 'New York', 'x': 250, 'y': 250},
+        {'label': 'Tokyo', 'x': 500, 'y': 250},
+        {'label': 'Hong Kong', 'x': 750, 'y': 250}]
+    app.difficultyButtons = [
+        {'label': 'Easy', 'x': 250, 'y': 550 },
+        {'label': 'Medium', 'x': 500, 'y': 550 },
+        {'label': 'Hard', 'x': 750, 'y': 550 }]
+    app.buttonWidth = 200
+    app.buttonHeight = 100
+
+def menu_onMousePress(app, mouseX, mouseY):
+    #Map button intersections
+    for button in app.mapButtons:
+        if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
+            app.buttonSound.play(restart=True, loop=False)
+            app.selectedMap = button['label']
+            break
+    #Difficulty button intersections
+    for button in app.difficultyButtons:
+        if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
+            app.buttonSound.play(restart=True, loop=False)
+            app.selectedDifficulty = button['label']
+            break
+    if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 300, 280, 80):
+        setActiveScreen('game')
+        app.startSound.play(restart=True, loop=False)
+        app.startTheme.pause()
+
+def menu_onKeyPress(app, key):
+    if key == 'escape':
+        app.startTheme.pause()
+        app.exitSound.play(loop=False)
+        setActiveScreen('start')
+    
+def menu_redrawAll(app):
+    #Button color adjustment according to difficulty
+    colorMap = {'Easy': rgb(230, 250, 255), 'Medium': rgb(255, 255, 224), 'Hard': rgb(255, 230, 240)}
+    highlightColor = colorMap.get(app.selectedDifficulty)
+
+    #Background Image source Google, edited in Pixelmator
+    if app.selectedMap == 'New York':
+        drawImage('img/NY.jpg', 0, 0, width=app.width, height=app.height)
+    elif app.selectedMap == 'Tokyo':
+        drawImage('img/TK.jpg', 0, 0, width=app.width, height=app.height)
+    elif app.selectedMap == 'Hong Kong':
+        drawImage('img/HK.jpg', 0, 0, width=app.width, height=app.height)
+    
+    #Map selection UI
+    drawLabel("Select Map", 100, 100, fill='aliceBlue', size=40, bold=True, font='montserrat', align='left')
+    for button in app.mapButtons:
+        color = highlightColor if app.selectedMap == button['label'] else 'darkGray'
+        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
+        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
+
+    #Difficulty selection UI
+    drawLabel("Select Difficulty", 100, 400, fill='aliceBlue', size=40, font='montserrat', bold=True, align='left')
+    for button in app.difficultyButtons:
+        color = highlightColor if app.selectedDifficulty == button['label'] else 'darkGray'
+        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
+        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
+
+    #Launch game button
+    drawRect(app.width/2, app.height/2 + 300, 200, 80, fill=highlightColor, align='center')
+    drawCircle(app.width/2 - 100, app.height/2 + 300, 40, fill=highlightColor)
+    drawCircle(app.width/2 + 100, app.height/2 + 300, 40, fill=highlightColor)
+    drawLabel("Start", app.width/2, app.height/2 + 300, fill=rgb(80, 80, 80), size=40, bold=True, font='montserrat')
+
+def drawRoundedRect(centerX, centerY, width, height, radius, fill):
+    drawRect(centerX, centerY, width, height - 2*radius, fill=fill, align='center')
+    drawRect(centerX, centerY, width - 2*radius, height, fill=fill, align='center')
+    drawCircle(centerX - width/2 + radius, centerY - height/2 + radius, radius, fill=fill)
+    drawCircle(centerX + width/2 - radius, centerY - height/2 + radius, radius, fill=fill)
+    drawCircle(centerX - width/2 + radius, centerY + height/2 - radius, radius, fill=fill)
+    drawCircle(centerX + width/2 - radius, centerY + height/2 - radius, radius, fill=fill)
+
+def intersectionRect(mouseX, mouseY, centerX, centerY, width, height):
+    left = centerX - width/2
+    right = centerX + width/2
+    top = centerY - height/2
+    bottom = centerY + height/2
+    return left <= mouseX <= right and top <= mouseY <= bottom
+
+
 def game_onScreenActivate(app):
     app.stations = []
     app.lines = []
@@ -301,44 +399,72 @@ def game_onScreenActivate(app):
     app.gameOver = False
     app.gameOverSoundPlayed = False
     app.timer = 0
-    #difficulty differences
+    #Difficulty settings
     if app.selectedDifficulty == 'Easy':
         app.passengerSpawnRate = 180 #Starts every 3 seconds, gradually increases in freq
         app.stationSpawnRate = 660 #Every 11 seconds
+        app.stationLimit = 20
+        app.spawnLimit = 30
+        app.stationCapacity = 10
         app.shapes = ['circle', 'square', 'triangle']
         app.colors = ['red', 'blue', 'green', 'orange', 'purple']
     elif app.selectedDifficulty == 'Medium':
         app.passengerSpawnRate = 120 #Starts every 2 seconds, gradually increases in freq
         app.stationSpawnRate = 600 #Every 10 seconds
+        app.stationLimit = 20
+        app.spawnLimit = 20
+        app.stationCapacity = 8
         app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
         app.colors = ['red', 'blue', 'green', 'orange', 'purple']
     elif app.selectedDifficulty == 'Hard':
-        app.passengerSpawnRate = 10 #Starts every 1.5 seconds, gradually increases in freq
+        app.passengerSpawnRate = 90 #Starts every 1.5 seconds, gradually increases in freq
         app.stationSpawnRate = 540 #Every 9 seconds
+        app.stationLimit = 30
+        app.spawnLimit = 10
+        app.stationCapacity = 8
         app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
         app.colors = ['red', 'blue', 'green']
     app.segment_map = {}
     app.paused = False
+    app.forceNewLine = False
     
     #Initial state
-    app.stations.append(Station(600, 400, 'circle'))
-    app.stations.append(Station(800, 300, 'square'))
-    app.stations.append(Station(950, 500, 'triangle'))
-    line = Line('red')
-    line.linkStation(app.stations[0])
-    line.linkStation(app.stations[1])
-    app.lines.append(line)
+    if app.selectedMap == 'New York':
+        app.gameTheme = app.newYorkTheme
+        app.gameTheme.play(restart=False, loop=True)
+        app.stations.append(Station(650, 500, 'circle'))
+        app.stations.append(Station(900, 300, 'square'))
+        app.stations.append(Station(950, 700, 'triangle'))
+    if app.selectedMap == 'Tokyo':
+        app.gameTheme = app.tokyoTheme
+        app.gameTheme.play(restart=False, loop=True)
+        app.stations.append(Station(600, 600, 'circle'))
+        app.stations.append(Station(800, 300, 'square'))
+        app.stations.append(Station(1100, 400, 'triangle'))
+    if app.selectedMap == 'Hong Kong':
+        app.gameTheme = app.hongKongTheme
+        app.gameTheme.play(restart=False, loop=True)
+        app.stations.append(Station(600, 400, 'circle'))
+        app.stations.append(Station(1200, 500, 'square'))
+        app.stations.append(Station(900, 600, 'triangle'))
 
 def game_onStep(app):
+    if app.paused:
+        return
+    app.timer += 1
+
     if app.gameOver:
-        if not app.gameOverSoundPlayed:
+        if not app.gameOverSoundPlayed: #Play sound only once
             app.gameOverSound.play(restart=True, loop=False)
             app.gameOverSoundPlayed = True
         if app.highScore < app.timer:
-            app.highScore = app.timer
+            app.highScore = app.timer #High score based on time survived
         return
+    
+    if app.passengerSpawnRate > app.spawnLimit and app.timer % 180 == 0: #Over time increase spawn freq
+        app.passengerSpawnRate -= 1
 
-    #AI - creates a map of all shared tracks
+    #Gemini AI - creates a map of all shared tracks
     segment_map = {}
     for line in app.lines:
         for i in range(len(line.stations) - 1):
@@ -352,41 +478,29 @@ def game_onStep(app):
     for segment in segment_map:
         segment_map[segment].sort(key=lambda l: l.color)
     app.segment_map = segment_map
-
-    if app.paused:
-        return
-    app.timer += 1
-
-    if app.passengerSpawnRate > 10 and app.timer % 180 == 0:
-        app.passengerSpawnRate -= 1
     
-
-    #animate trains
-    for line in app.lines:
+    for line in app.lines: #Animate trains
         for train in line.trains:
             train.move()
 
-    #spawn passengers
-    if app.timer % app.passengerSpawnRate == 0 and app.stations:
+    if app.timer % app.passengerSpawnRate == 0 and app.stations: #Spawn passengers
         startStation = random.choice(app.stations)
         possible_destinations = [s.shape for s in app.stations if s.shape != startStation.shape]
         if possible_destinations:
             dest_shape = random.choice(possible_destinations)
             startStation.passengers.append(Passenger(dest_shape))
 
-    #spawn stations
-    if app.timer > 0 and app.timer % app.stationSpawnRate == 0:
-        if len(app.stations) < 20:
+    if app.timer > 0 and app.timer % app.stationSpawnRate == 0: #Spawn stations
+        if len(app.stations) < app.stationLimit:
             x = random.randint(100, app.width - 100)
             y = random.randint(100, app.height - 200)
             shape = random.choice(app.shapes)
-            isOverlapping = any((s.x - x)**2 + (s.y - y)**2 < (s.radius * 4)**2 for s in app.stations)
+            isOverlapping = any((station.x - x)**2 + (station.y - y)**2 < (station.radius * 4)**2 for station in app.stations)
             if not isOverlapping:
                 app.stations.append(Station(x, y, shape))
 
-    #check for overcrowding
-    for station in app.stations:
-        if len(station.passengers) > 8:
+    for station in app.stations: #Check for overcrowding
+        if len(station.passengers) > app.stationCapacity:
             app.gameOver = True
 
 def game_onMousePress(app, mouseX, mouseY):
@@ -409,17 +523,19 @@ def game_onMousePress(app, mouseX, mouseY):
                 app.selectedStation = None #clicked on same station again, unselect
                 return
             extendableLine, endpointStation, newStation = findExtendableLine(app, app.selectedStation, clickedStation)
-            if extendableLine: #extend line
+            if extendableLine and app.forceNewLine == False: #extend line
                 app.connectSound.play(restart=True, loop=False)
                 extendableLine.extendLine(newStation, endpointStation)
             else: #create new line
-                app.connectSound.play(restart=True, loop=False)
                 if len(app.lines) < len(app.colors):
+                    app.connectSound.play(restart=True, loop=False)
                     color = app.colors[len(app.lines)]
                     new_line = Line(color)
                     new_line.linkStation(app.selectedStation)
                     new_line.linkStation(clickedStation)
                     app.lines.append(new_line)
+                else:
+                    app.gameOverSound.play(restart=True, loop=False)
             app.selectedStation = None #unselect
     else:
         app.unselectSound.play(restart=True, loop=False)
@@ -435,12 +551,23 @@ def game_onKeyPress(app, key):
         else:
             app.pauseSound.play(restart=True, loop=False)
         app.paused = not app.paused
+    elif key == 'p':
+        app.gameTheme.pause()
     if key == 'escape':
+        app.gameTheme.pause()
         app.exitSound.play(restart=True, loop=False)
         setActiveScreen('start')
 
+def game_onKeyHold(app, keys):
+    if 'n' in keys:
+        app.forceNewLine = True
+
+def game_onKeyRelease(app, key):
+    if key == 'n':
+        app.forceNewLine = False
+
 def game_redrawAll(app):
-    #map differences
+    #Draw map, images made by myself in Pixelmator
     if app.selectedMap == 'New York':
         drawImage('img/NY_Map.jpg', 0, 0, width=app.width, height=app.height)
     elif app.selectedMap == 'Tokyo':
@@ -474,39 +601,39 @@ def game_redrawAll(app):
 
     #Highlight stations
     if app.selectedStation:
-        drawCircle(app.selectedStation.x, app.selectedStation.y, app.selectedStation.radius + 5, fill=None, border='gold', borderWidth=3) #gold highlight for first selection
+        drawCircle(app.selectedStation.x, app.selectedStation.y, app.selectedStation.radius + 5, fill='gold', opacity=30) #Gold highlight for first selection
 
         for station in app.stations:
             if station != app.selectedStation:
                 extendableLine, _, _ = findExtendableLine(app, app.selectedStation, station)
 
                 if extendableLine:
-                    #green for available extension
+                    #Green for available extension
                     if station.shape == 'triangle':
-                        drawRegularPolygon(station.x, station.y, station.radius + 12, 3, fill=None, border='green', borderWidth=2)
+                        drawRegularPolygon(station.x, station.y, station.radius + 13, 3, fill=None, border='green', borderWidth=2)
                     elif station.shape == 'square':
                         drawRegularPolygon(station.x, station.y, station.radius + 12, 4, fill=None, border='green', borderWidth=2, rotateAngle=45)
                     elif station.shape == 'circle':
-                        drawCircle(station.x, station.y, station.radius + 3, fill=None, border='green', borderWidth=2)
+                        drawCircle(station.x, station.y, station.radius + 4, fill=None, border='green', borderWidth=2)
                     elif station.shape == 'diamond':
                         drawRegularPolygon(station.x, station.y, station.radius + 12, 4, fill=None, border='green', borderWidth=2)
                     elif station.shape == 'pentagon':
                         drawRegularPolygon(station.x, station.y, station.radius + 12, 5, fill=None, border='green', borderWidth=2)
 
                 elif len(app.lines) < len(app.colors):
-                    #blue for available connection with new line
+                    #Blue for available connection with new line
                     if station.shape == 'triangle':
-                        drawRegularPolygon(station.x, station.y, station.radius + 12, 3, fill=None, border='blue', borderWidth=2)
+                        drawRegularPolygon(station.x, station.y, station.radius + 13, 3, fill=None, border='blue', borderWidth=2)
                     elif station.shape == 'square':
                         drawRegularPolygon(station.x, station.y, station.radius + 12, 4, fill=None, border='blue', borderWidth=2, rotateAngle=45)
                     elif station.shape == 'circle':
-                        drawCircle(station.x, station.y, station.radius + 3, fill=None, border='blue', borderWidth=2)
+                        drawCircle(station.x, station.y, station.radius + 4, fill=None, border='blue', borderWidth=2)
                     elif station.shape == 'diamond':
                         drawRegularPolygon(station.x, station.y, station.radius + 12, 4, fill=None, border='blue', borderWidth=2)
                     elif station.shape == 'pentagon':
                         drawRegularPolygon(station.x, station.y, station.radius + 12, 5, fill=None, border='blue', borderWidth=2)
 
-    #UI
+    #UI & Info
     drawLabel("MICRO METRO", 220, 50, size=50, fill='white', bold=True, font='montserrat', opacity=50)
     drawRect(0, app.height - 100, app.width, 100, fill='dimGray', opacity = 50)
     drawLabel("USED LINES:", 38, app.height - 75, size=20, fill='white', bold=True, font='montserrat', align='left')
@@ -517,33 +644,33 @@ def game_redrawAll(app):
             drawCircle(x, y, 12, fill=color, border='white', borderWidth=2)
         else:
             drawCircle(x, y, 12, fill='lightGray', border='white', borderWidth=2)
-    
-    #Info display
+
+    drawLabel(f'Force new line: {app.forceNewLine} (hold n)', 300, app.height-40, fill='white', size=16, bold=True, align='left', font='montserrat')
     total_passengers = sum(len(station.passengers) for station in app.stations)
     drawLabel(f"Waiting Passengers: {total_passengers}", app.width - 60, app.height - 80, size=16, fill='white', bold=True, align='right', font='montserrat')
     drawLabel(f"Time: {app.timer // 60}s", app.width - 60, app.height - 60, size=16, fill='white', align='right', font='montserrat')
     drawLabel(f"Stations: {len(app.stations)}", app.width - 60, app.height - 40, size=16, fill='white', align='right', font='montserrat')
     drawLabel(f"Lines: {len(app.lines)}", app.width - 60, app.height - 20, size=16, fill='white', align='right', font='montserrat')
-    drawLabel(f"Passenger Spawn Rate: {(app.passengerSpawnRate / 60):.3f} per second", app.width - 500, app.height - 80, size=16, fill='white', bold=True, align='right', font='montserrat')
+    drawLabel(f"Passenger demand: {1/(app.passengerSpawnRate/180):.2f}", app.width/2, app.height - 80, size=20, fill='paleGreen', bold=True, align='center', font='montserrat')
 
-    if app.selectedStation:
-        drawLabel("Click another station to connect", app.width//2, app.height - 200, size=18, fill='black', bold=True, font='montserrat')
-        drawLabel("Yellow: Currently selected  Green: Available connections  Blue: Create new line", app.width//2, app.height - 150, size=18, fill='black', font='montserrat')
+    if app.selectedStation: #Connection key
+        drawLabel("Click another station to connect", app.width//2, 50, size=18, fill='black', bold=True, font='montserrat')
+        drawLabel("Yellow: Currently selected  Green: Available connections  Blue: Create new line", app.width//2, 90, size=18, fill='black', font='montserrat')
     else:
-        drawLabel("Click a station to draw lines", app.width//2, app.height - 200, size=18, fill='black', font='montserrat')
+        drawLabel("Click a station to draw lines", app.width//2, 50, size=18, fill='black', font='montserrat')
 
-    if app.paused:
+    if app.paused: #Pause symbol
         drawRect(app.width/2 - 20, app.height/2 - 100, 20, 100, fill='maroon', opacity=50)
         drawRect(app.width/2 + 20, app.height/2 - 100, 20, 100, fill='maroon', opacity=50)
 
-    if app.gameOver:
+    if app.gameOver: #Game over UI
         drawRect(app.width/2 - 200, app.height/2 - 75, 400, 150, fill='maroon', opacity=50)
         drawLabel("RIOTS!", app.width/2, app.height/2 - 30, size=40, fill='white', bold=True, font='montserrat')
         drawLabel("A station became overcrowded!", app.width/2, app.height/2 + 10, size=20, fill='white', font='montserrat')
         drawLabel(f"You survived {app.timer // 60} seconds", app.width/2, app.height/2 + 35, size=20, fill='white', font='montserrat')
         drawLabel("Press SPACE to restart", app.width/2, app.height/2 + 90, size=20, fill='gray', bold=True, font='montserrat')
 
-def findExtendableLine(app, station1, station2):
+def findExtendableLine(station1, station2):
     #priority for first selected station
     #checks if first selected line is valid
     for line in station1.lines:
@@ -559,121 +686,6 @@ def findExtendableLine(app, station1, station2):
 
     return None, None, None
 
-def start_onScreenActivate(app):
-    app.startButtonHover = False
-    app.startTheme.play(restart=False, loop=True)
-
-def start_onMouseMove(app, mouseX, mouseY):
-    if intersectionRect(mouseX, mouseY, app.width/2, 716, 600, 132):
-        app.startButtonHover = True
-    else:
-        app.startButtonHover = False
-
-def start_onMousePress(app, mouseX, mouseY):
-    if intersectionRect(mouseX, mouseY, app.width/2, 716, 600, 132):
-        app.startSound.play(restart=True, loop=False)
-        setActiveScreen('menu')
-
-def start_redrawAll(app):
-    if app.startButtonHover == True:
-        drawImage('img/Start_Screen_hover.jpg', 0, 0, width=app.width, height=app.height)
-    else:
-        drawImage('img/Start_Screen.jpg', 0, 0, width=app.width, height=app.height)
-    #Score
-    drawLabel(f'High Score: {app.highScore}', app.width/2, 330, fill='white', size=35, bold=True, font='montserrat')
-
-def menu_onScreenActivate(app):
-    app.selectedMap = 'New York'
-    app.selectedDifficulty = 'Easy'
-    app.mapButtons = [
-        {'label': 'New York', 'x': 250, 'y': 250},
-        {'label': 'Tokyo', 'x': 500, 'y': 250},
-        {'label': 'Hong Kong', 'x': 750, 'y': 250}
-    ]
-    app.difficultyButtons = [
-        {'label': 'Easy', 'x': 250, 'y': 550 },
-        {'label': 'Medium', 'x': 500, 'y': 550 },
-        {'label': 'Hard', 'x': 750, 'y': 550 }
-    ]
-    app.buttonWidth = 200
-    app.buttonHeight = 100
-
-def menu_onMousePress(app, mouseX, mouseY):
-    #map button intersections
-    for button in app.mapButtons:
-        if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
-            app.buttonSound.play(restart=True, loop=False)
-            app.selectedMap = button['label']
-            break
-    #difficulty button intersections
-    for button in app.difficultyButtons:
-        if intersectionRect(mouseX, mouseY, button['x'], button['y'], app.buttonWidth, app.buttonHeight):
-            app.buttonSound.play(restart=True, loop=False)
-            app.selectedDifficulty = button['label']
-            break
-    if intersectionRect(mouseX, mouseY, app.width/2, app.height/2 + 300, 280, 80):
-        setActiveScreen('game')
-        app.startSound.play(restart=True, loop=False)
-        app.startTheme.pause()
-
-def menu_onKeyPress(app, key):
-    if key == 'escape':
-        app.startTheme.pause()
-        app.exitSound.play(loop=False)
-        setActiveScreen('start')
-    
-def menu_redrawAll(app):
-    #color adjustment according to difficulty
-    colorMap = {
-        'Easy': rgb(230, 250, 255),
-        'Medium': rgb(255, 255, 224),
-        'Hard': rgb(255, 230, 240)
-    }
-    highlightColor = colorMap.get(app.selectedDifficulty)
-
-    #background Image
-    if app.selectedMap == 'New York':
-        drawImage('img/NY.jpg', 0, 0, width=app.width, height=app.height)
-    elif app.selectedMap == 'Tokyo':
-        drawImage('img/TK.jpg', 0, 0, width=app.width, height=app.height)
-    elif app.selectedMap == 'Hong Kong':
-        drawImage('img/HK.jpg', 0, 0, width=app.width, height=app.height)
-    
-    #map selection UI
-    drawLabel("Select Map", 100, 100, fill='aliceBlue', size=40, bold=True, font='montserrat', align='left')
-    for button in app.mapButtons:
-        color = highlightColor if app.selectedMap == button['label'] else 'darkGray'
-        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
-        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
-
-    #difficulty selection UI
-    drawLabel("Select Difficulty", 100, 400, fill='aliceBlue', size=40, font='montserrat', bold=True, align='left')
-    for button in app.difficultyButtons:
-        color = highlightColor if app.selectedDifficulty == button['label'] else 'darkGray'
-        drawRoundedRect(button['x'], button['y'], app.buttonWidth, app.buttonHeight, 30, color)
-        drawLabel(button['label'], button['x'], button['y'], size=30, font='montserrat', fill=rgb(80, 80, 80))
-
-    #launch game button
-    drawRect(app.width/2, app.height/2 + 300, 200, 80, fill=highlightColor, align='center')
-    drawCircle(app.width/2 - 100, app.height/2 + 300, 40, fill=highlightColor)
-    drawCircle(app.width/2 + 100, app.height/2 + 300, 40, fill=highlightColor)
-    drawLabel("Start", app.width/2, app.height/2 + 300, fill=rgb(80, 80, 80), size=40, bold=True, font='montserrat')
-
-def drawRoundedRect(centerX, centerY, width, height, radius, fill):
-    radius = min(abs(radius), width/2, height / 2)
-    drawRect(centerX, centerY, width, height - 2*radius, fill=fill, align='center')
-    drawRect(centerX, centerY, width - 2*radius, height, fill=fill, align='center')
-    drawCircle(centerX - width/2 + radius, centerY - height/2 + radius, radius, fill=fill)
-    drawCircle(centerX + width/2 - radius, centerY - height/2 + radius, radius, fill=fill)
-    drawCircle(centerX - width/2 + radius, centerY + height/2 - radius, radius, fill=fill)
-    drawCircle(centerX + width/2 - radius, centerY + height/2 - radius, radius, fill=fill)
-
-def intersectionRect(mouseX, mouseY, centerX, centerY, width, height):
-    left = centerX - width/2
-    right = centerX + width/2
-    top = centerY - height/2
-    bottom = centerY + height/2
-    return left <= mouseX <= right and top <= mouseY <= bottom
 
 def main():
     runAppWithScreens(initialScreen='start', width=1600, height=900)
