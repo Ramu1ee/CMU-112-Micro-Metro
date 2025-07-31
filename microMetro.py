@@ -401,7 +401,7 @@ def game_onScreenActivate(app):
     app.timer = 0
     #Difficulty settings
     if app.selectedDifficulty == 'Easy':
-        app.passengerSpawnRate = 180 #Starts every 3 seconds, gradually increases in freq
+        app.passengerSpawnRate = 140 #Starts every 2.33 seconds, gradually increases in freq
         app.stationSpawnRate = 660 #Every 11 seconds
         app.stationLimit = 20
         app.spawnLimit = 30
@@ -409,7 +409,7 @@ def game_onScreenActivate(app):
         app.shapes = ['circle', 'square', 'triangle']
         app.colors = ['red', 'blue', 'green', 'orange', 'purple']
     elif app.selectedDifficulty == 'Medium':
-        app.passengerSpawnRate = 120 #Starts every 2 seconds, gradually increases in freq
+        app.passengerSpawnRate = 100 #Starts every 1.67 seconds, gradually increases in freq
         app.stationSpawnRate = 600 #Every 10 seconds
         app.stationLimit = 20
         app.spawnLimit = 20
@@ -417,7 +417,7 @@ def game_onScreenActivate(app):
         app.shapes = ['circle', 'square', 'triangle', 'diamond', 'pentagon']
         app.colors = ['red', 'blue', 'green', 'orange', 'purple']
     elif app.selectedDifficulty == 'Hard':
-        app.passengerSpawnRate = 90 #Starts every 1.5 seconds, gradually increases in freq
+        app.passengerSpawnRate = 10 #Starts every 1.33 seconds, gradually increases in freq
         app.stationSpawnRate = 540 #Every 9 seconds
         app.stationLimit = 30
         app.spawnLimit = 10
@@ -451,7 +451,6 @@ def game_onScreenActivate(app):
 def game_onStep(app):
     if app.paused:
         return
-    app.timer += 1
 
     if app.gameOver:
         if not app.gameOverSoundPlayed: #Play sound only once
@@ -460,7 +459,8 @@ def game_onStep(app):
         if app.highScore < app.timer:
             app.highScore = app.timer #High score based on time survived
         return
-    
+    app.timer += 1
+
     if app.passengerSpawnRate > app.spawnLimit and app.timer % 180 == 0: #Over time increase spawn freq
         app.passengerSpawnRate -= 1
 
@@ -522,7 +522,7 @@ def game_onMousePress(app, mouseX, mouseY):
                 app.unselectSound.play(restart=True, loop=False)
                 app.selectedStation = None #clicked on same station again, unselect
                 return
-            extendableLine, endpointStation, newStation = findExtendableLine(app, app.selectedStation, clickedStation)
+            extendableLine, endpointStation, newStation = findExtendableLine(app.selectedStation, clickedStation)
             if extendableLine and app.forceNewLine == False: #extend line
                 app.connectSound.play(restart=True, loop=False)
                 extendableLine.extendLine(newStation, endpointStation)
@@ -605,7 +605,7 @@ def game_redrawAll(app):
 
         for station in app.stations:
             if station != app.selectedStation:
-                extendableLine, _, _ = findExtendableLine(app, app.selectedStation, station)
+                extendableLine, _, _ = findExtendableLine(app.selectedStation, station)
 
                 if extendableLine:
                     #Green for available extension
